@@ -1297,6 +1297,19 @@ class test_tasks(TasksCase):
         (last_task,) = send_task.call_args.kwargs['chain']
         assert last_task.options['link'] == [callback]
 
+    def test_replace_chain_with_own_link_links_it_once(self):
+        own = self.mytask.si()
+        c = chain([self.mytask.si(), self.mytask.si()], app=self.app).set(link=own)
+        self.mytask.request.id = 'id'
+        self.mytask.request.callbacks = None
+        with patch.object(self.app, 'send_task') as send_task:
+            with pytest.raises(Ignore):
+                self.mytask.replace(c)
+        # A link set on the replacement chain itself, with no callbacks
+        # on the replaced task, is also linked to the last task once.
+        (last_task,) = send_task.call_args.kwargs['chain']
+        assert last_task.options['link'] == [own]
+
     def test_replace_chain_ending_in_group(self):
         c = chain(
             [
